@@ -20,6 +20,8 @@
     "no-underscore-dangle": "off",
     "consistent-return": "off",
     "no-param-reassign": "off",
-    "func-names":"off"
+    "func-names":"off",
+    "no-plusplus":"off",
+    "no-useless-escape":"off"
   }
 }
