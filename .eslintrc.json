@@ -16,12 +16,17 @@
   "rules": {
     "prettier/prettier": "error",
     "no-console": "off",
+    "prefer-const": "off",
     "no-unused-vars": "off",
     "no-underscore-dangle": "off",
     "consistent-return": "off",
     "no-param-reassign": "off",
     "func-names":"off",
     "no-plusplus":"off",
-    "no-useless-escape":"off"
+    "no-useless-escape":"off",
+    "radix": "off",
+    "no-loop-func": "off",
+    "no-await-in-loop":"off",
+    "no-async-promise-executor": "off"
   }
 }

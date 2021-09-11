@@ -3,79 +3,150 @@ const { createCanvas, loadImage } = require("canvas");
 const { layers, width, height } = require("./input/config");
 
 const myArgs = process.argv.slice(2); // Args entered in the terminal "node index.js X"
-const edition = myArgs.length > 0 ? Number(myArgs[0]) : 1;
-const metadata = [];
-let attributes = [];
-let hash = [];
-let decodedHash = [];
+const editionSize = myArgs.length > 0 ? Number(myArgs[0]) : 1;
+const metadataList = [];
+let attributesList = [];
+let dnaList = [];
 
 const canvas = createCanvas(1000, 1000);
 const ctx = canvas.getContext("2d");
 
-const saveLayer = (_canvas, _edition) => {
-  fs.writeFileSync(`./output/${_edition}.png`, _canvas.toBuffer("image/png"));
+const saveImage = (_editionCount) => {
+  fs.writeFileSync(
+    `./output/${_editionCount}.png`,
+    canvas.toBuffer("image/png")
+  );
 };
 
-const addMetadata = (_edition) => {
+const signImage = (_sign) => {
+  console.log(_sign);
+  ctx.fillStyle = "#000";
+  ctx.font = "bold 30pt Courier";
+  ctx.textBaseline = "top";
+  ctx.textAlign = "left";
+  ctx.fillText(_sign, 40, 40);
+};
+
+// INFO: Creates pastel background -> not needed, background almost not visible and defined in layers
+const genColor = () => {
+  const hue = Math.floor(Math.random() * 360);
+  const pastel = `hsl(${hue}, 100%, 85%)`;
+  return pastel;
+};
+const drawBackground = () => {
+  ctx.fillStyle = genColor();
+  ctx.fillRect(0, 0, width, height);
+};
+
+const addMetadata = (_dna, _edition) => {
   const dateTime = Date.now();
   const tempMetadata = {
-    hash: hash.join(""),
-    decodedHash,
+    dna: _dna,
     edition: _edition,
     date: dateTime,
-    attributes,
+    attributes: attributesList,
   };
-  metadata.push(tempMetadata);
-  attributes = [];
-  hash = [];
-  decodedHash = [];
+  metadataList.push(tempMetadata);
+  attributesList = [];
 };
 
-const addAttributes = (_element, _layer) => {
-  const tempAttr = {
-    id: _element.id,
-    layer: _layer.name,
-    name: _element.name,
-    rarity: _element.rarity,
-  };
-  attributes.push(tempAttr);
-  hash.push(_layer.id);
-  hash.push(_element.id);
-  decodedHash.push({ [_layer.id]: _element.id });
-};
-
-const drawLayer = async (_layer, _edition) => {
-  // Pick a random layer element
-  const element =
-    _layer.elements[Math.floor(Math.random() * _layer.elements.length)];
-
-  addAttributes(element, _layer);
-  // Load and save random layer element
-  try {
-    const image = await loadImage(`${_layer.location}${element.fileName}`);
-    ctx.drawImage(
-      image,
-      _layer.position.x,
-      _layer.position.y,
-      _layer.size.width,
-      _layer.size.height
-    ); // draw image on the canvas: image, x, y, width, height
-
-    saveLayer(canvas, _edition);
-  } catch (error) {
-    console.log("Error:", error);
-  }
-};
-
-for (let i = 1; i <= edition; i++) {
-  layers.forEach((layer) => {
-    drawLayer(layer, i);
+const addAttributes = (_element) => {
+  let { selectedElement } = _element.layer;
+  attributesList.push({
+    name: selectedElement.name,
+    rarity: selectedElement.rarity,
   });
-  addMetadata(i);
-  console.log(`Creating edition ${i}`);
-}
+};
 
-fs.readFile("./output/_metadata.json", (err, data) => {
-  if (err) throw err;
-  fs.writeFileSync("./output/_metadata.json", JSON.stringify(metadata));
-});
+const loadLayerImg = async (_layer) =>
+  new Promise(async (resolve) => {
+    const image = await loadImage(
+      `${_layer.location}${_layer.selectedElement.fileName}`
+    );
+    resolve({ layer: _layer, loadedImage: image });
+  });
+// Pick a random layer element
+// const element =
+//   _layer.elements[Math.floor(Math.random() * _layer.elements.length)];
+
+const drawElement = (_element) => {
+  ctx.drawImage(
+    _element.loadedImage,
+    _element.layer.position.x,
+    _element.layer.position.y,
+    _element.layer.size.width,
+    _element.layer.size.height
+  ); // draw image on the canvas: image, x, y, width, height
+  addAttributes(_element);
+};
+
+const constructLayerToDna = (_dna, _layers) => {
+  // splits dna string into array of 2-digit numbers
+  let DnaSegment = _dna.toString().match(/.{1,2}/g);
+  let mappedDnaToLayers = _layers.map((layer) => {
+    let selectedElement =
+      layer.elements[parseInt(DnaSegment) % layer.elements.length];
+    return {
+      location: layer.location,
+      position: layer.position,
+      size: layer.size,
+      selectedElement,
+    };
+  });
+  return mappedDnaToLayers;
+};
+
+const isDnaUnique = (_DnaList, _dna) => {
+  const foundDna = _DnaList.find((i) => i === _dna);
+  return foundDna === undefined; // is true when undefined and therefore unique
+};
+
+const createDNA = (_length) => {
+  // 14 digit random number for the 7 input types
+  let randNum = Math.floor(
+    Number(`1e${_length}`) + Math.random() * Number(`9e${_length}`)
+  );
+  // console.log(randNum);
+  return randNum;
+};
+
+const writeMetaData = (_data) => {
+  fs.writeFileSync("./output/_metadata.json", _data);
+};
+
+// Minting
+const startCreating = async () => {
+  writeMetaData("");
+  let editionCount = 1;
+
+  while (editionCount <= editionSize) {
+    let newDna = createDNA(layers.length * 2 - 1);
+    // only when DNA is unique
+    if (isDnaUnique(dnaList, newDna)) {
+      let loadedElements = []; // promise array
+
+      let results = constructLayerToDna(newDna, layers);
+      results.forEach((layer) => {
+        loadedElements.push(loadLayerImg(layer)); // promise
+      });
+
+      await Promise.all(loadedElements).then((elementArray) => {
+        // drawBackground(); // INFO: not needed
+        elementArray.forEach((element) => {
+          drawElement(element);
+        });
+        signImage(`#${editionCount}`);
+        saveImage(editionCount);
+        addMetadata(newDna, editionCount);
+        console.log(`Created edition ${editionCount} with DNA: ${newDna}`);
+      });
+      dnaList.push(newDna);
+      editionCount++;
+    } else {
+      console.log("DNA exists");
+    }
+  }
+  writeMetaData(JSON.stringify(metadataList));
+};
+
+startCreating();
