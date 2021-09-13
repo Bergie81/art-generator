@@ -41,7 +41,7 @@ const drawBackground = () => {
 const addMetadata = (_dna, _edition) => {
   const dateTime = Date.now();
   const tempMetadata = {
-    dna: _dna,
+    dna: _dna.join(""),
     edition: _edition,
     date: dateTime,
     attributes: attributesList,
@@ -80,12 +80,9 @@ const drawElement = (_element) => {
   addAttributes(_element);
 };
 
-const constructLayerToDna = (_dna, _layers) => {
-  // splits dna string into array of 2-digit numbers
-  let DnaSegment = _dna.toString().match(/.{1,2}/g);
-  let mappedDnaToLayers = _layers.map((layer) => {
-    let selectedElement =
-      layer.elements[parseInt(DnaSegment) % layer.elements.length];
+const constructLayerToDna = (_dna = [], _layers = []) => {
+  let mappedDnaToLayers = _layers.map((layer, index) => {
+    let selectedElement = layer.elements[_dna[index]];
     return {
       location: layer.location,
       position: layer.position,
@@ -96,17 +93,18 @@ const constructLayerToDna = (_dna, _layers) => {
   return mappedDnaToLayers;
 };
 
-const isDnaUnique = (_DnaList, _dna) => {
-  const foundDna = _DnaList.find((i) => i === _dna);
+const isDnaUnique = (_DnaList = [], _dna = []) => {
+  const foundDna = _DnaList.find((i) => i.join("") === _dna.join(""));
   return foundDna === undefined; // is true when undefined and therefore unique
 };
 
-const createDNA = (_length) => {
+const createDNA = (_layers) => {
   // 14 digit random number for the 7 input types
-  let randNum = Math.floor(
-    Number(`1e${_length}`) + Math.random() * Number(`9e${_length}`)
-  );
-  // console.log(randNum);
+  let randNum = [];
+  _layers.forEach((layer) => {
+    let num = Math.floor(Math.random() * layer.elements.length);
+    randNum.push(num);
+  });
   return randNum;
 };
 
@@ -120,7 +118,7 @@ const startCreating = async () => {
   let editionCount = 1;
 
   while (editionCount <= editionSize) {
-    let newDna = createDNA(layers.length * 2 - 1);
+    let newDna = createDNA(layers);
     // only when DNA is unique
     if (isDnaUnique(dnaList, newDna)) {
       let loadedElements = []; // promise array
@@ -131,6 +129,7 @@ const startCreating = async () => {
       });
 
       await Promise.all(loadedElements).then((elementArray) => {
+        // ctx.clearRect(0, 0, width, height);
         // drawBackground(); // INFO: not needed
         elementArray.forEach((element) => {
           drawElement(element);
