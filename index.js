@@ -1,9 +1,19 @@
 const fs = require("fs");
 const { createCanvas, loadImage } = require("canvas");
-const { layers, width, height } = require("./input/config");
+const {
+  layers,
+  width,
+  height,
+  description,
+  baseImageUri,
+  editionSize,
+  startEditionFrom,
+  endEditionAt,
+  rarityWeights,
+} = require("./input/config");
 
-const myArgs = process.argv.slice(2); // Args entered in the terminal "node index.js X"
-const editionSize = myArgs.length > 0 ? Number(myArgs[0]) : 1;
+// const myArgs = process.argv.slice(2); // Args entered in the terminal "node index.js X"
+// const editionSize = myArgs.length > 0 ? Number(myArgs[0]) : 1;
 const metadataList = [];
 let attributesList = [];
 let dnaList = [];
@@ -42,6 +52,9 @@ const addMetadata = (_dna, _edition) => {
   const dateTime = Date.now();
   const tempMetadata = {
     dna: _dna.join(""),
+    name: `#${_edition}`,
+    description,
+    image: `${baseImageUri}/${_edition}`,
     edition: _edition,
     date: dateTime,
     attributes: attributesList,
@@ -60,9 +73,7 @@ const addAttributes = (_element) => {
 
 const loadLayerImg = async (_layer) =>
   new Promise(async (resolve) => {
-    const image = await loadImage(
-      `${_layer.location}${_layer.selectedElement.fileName}`
-    );
+    const image = await loadImage(`${_layer.selectedElement.path}`);
     resolve({ layer: _layer, loadedImage: image });
   });
 // Pick a random layer element
@@ -80,9 +91,9 @@ const drawElement = (_element) => {
   addAttributes(_element);
 };
 
-const constructLayerToDna = (_dna = [], _layers = []) => {
+const constructLayerToDna = (_dna = [], _layers = [], _rarity) => {
   let mappedDnaToLayers = _layers.map((layer, index) => {
-    let selectedElement = layer.elements[_dna[index]];
+    let selectedElement = layer.elements[_rarity][_dna[index]];
     return {
       location: layer.location,
       position: layer.position,
@@ -93,16 +104,29 @@ const constructLayerToDna = (_dna = [], _layers = []) => {
   return mappedDnaToLayers;
 };
 
+// returns "original" or "rare" or "super_rare"
+const getRarity = (_editionCount) => {
+  let rarity = "";
+  rarityWeights.forEach((rarityWeight) => {
+    if (
+      _editionCount >= rarityWeight.from &&
+      _editionCount <= rarityWeight.to
+    ) {
+      rarity = rarityWeight.value;
+    }
+  });
+  return rarity;
+};
+
 const isDnaUnique = (_DnaList = [], _dna = []) => {
   const foundDna = _DnaList.find((i) => i.join("") === _dna.join(""));
   return foundDna === undefined; // is true when undefined and therefore unique
 };
 
-const createDNA = (_layers) => {
-  // 14 digit random number for the 7 input types
+const createDNA = (_layers, _rarity) => {
   let randNum = [];
   _layers.forEach((layer) => {
-    let num = Math.floor(Math.random() * layer.elements.length);
+    let num = Math.floor(Math.random() * layer.elements[_rarity].length);
     randNum.push(num);
   });
   return randNum;
@@ -115,22 +139,29 @@ const writeMetaData = (_data) => {
 // Minting
 const startCreating = async () => {
   writeMetaData("");
-  let editionCount = 1;
+  let editionCount = startEditionFrom;
 
-  while (editionCount <= editionSize) {
-    let newDna = createDNA(layers);
+  while (editionCount <= endEditionAt) {
+    console.log("Edition Count:", editionCount);
+
+    let rarity = getRarity(editionCount);
+    console.log(rarity);
+
+    let newDna = createDNA(layers, rarity);
+    console.log("DNA List:", dnaList);
+
     // only when DNA is unique
     if (isDnaUnique(dnaList, newDna)) {
       let loadedElements = []; // promise array
 
-      let results = constructLayerToDna(newDna, layers);
+      let results = constructLayerToDna(newDna, layers, rarity);
       results.forEach((layer) => {
         loadedElements.push(loadLayerImg(layer)); // promise
       });
 
       await Promise.all(loadedElements).then((elementArray) => {
-        // ctx.clearRect(0, 0, width, height);
-        // drawBackground(); // INFO: not needed
+        ctx.clearRect(0, 0, width, height);
+        drawBackground();
         elementArray.forEach((element) => {
           drawElement(element);
         });
