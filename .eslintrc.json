@@ -27,6 +27,7 @@
     "radix": "off",
     "no-loop-func": "off",
     "no-await-in-loop":"off",
-    "no-async-promise-executor": "off"
+    "no-async-promise-executor": "off",
+    "eqeqeq":"off"
   }
 }
